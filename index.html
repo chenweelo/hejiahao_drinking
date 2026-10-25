@@ -329,23 +329,28 @@
             }
         }
 
-        // Android 主機背景輪詢 Google 試算表是否有新訂單
+        // Android 主機背景輪詢 Google 試算表是否有新訂單（加入防快取參數 ?t=）
         async function pollCloudOrders(syncUrl) {
             const isHost = document.getElementById('isHostMode').checked;
             if (!isHost || !usbDevice || !usbEndpoint || !syncUrl) return;
 
             try {
-                const res = await fetch(syncUrl);
+                // 加上時間戳記避免 Google 伺服器快取舊資料
+                const res = await fetch(syncUrl + "?t=" + Date.now());
                 if (res.ok) {
                     const data = await res.json();
                     if (Array.isArray(data) && data.length > 0) {
                         console.log("收到雲端新訂單，開始列印...", data);
-                        // 清空雲端佇列
+                        document.getElementById('statusBar').innerText = `🖨️ 正在列印來自 iPad 的新訂單...`;
+                        
+                        // 先清空雲端佇列
                         await fetch(syncUrl, {
                             method: 'POST',
                             body: JSON.stringify([])
                         });
+                        
                         await executePrintTasks(data);
+                        document.getElementById('statusBar').innerText = `🟢 USB 印表機已連線 (主機模式監聽中...)`;
                     }
                 }
             } catch (err) {
