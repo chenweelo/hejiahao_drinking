@@ -14,7 +14,7 @@
 
         /* 雲端同步設定區 */
         .sync-config { background: #fff3cd; border-bottom: 1px solid #ffeeba; padding: 10px 15px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
-        .sync-config input { padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem; width: 180px; }
+        .sync-config input { padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem; width: 220px; }
         .sync-config label { font-weight: bold; color: #856404; display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
         .container { max-width: 600px; margin: 0 auto; padding: 15px; }
@@ -60,8 +60,8 @@
     
     <!-- 雲端同步設定列 -->
     <div class="sync-config">
-        <span>☁️ 同步密鑰：</span>
-        <input type="text" id="syncToken" value="hejiating-pos-888" placeholder="輸入相同密鑰互聯">
+        <span>☁️ 同步密鑰(亂碼)：</span>
+        <input type="text" id="syncToken" value="qrGbNufPjzsX6g6n1q9Gj" placeholder="貼上 kvdb 亂碼">
         <label><input type="checkbox" id="isHostMode" onchange="toggleHostMode()"> 🔴 作為列印主機(Android)</label>
     </div>
 
@@ -130,7 +130,7 @@
             </div>
 
             <div class="option-group">
-                <div class="option-title">冰塊 / 溫度（已新增「溫」選項）</div>
+                <div class="option-title">冰塊 / 溫度</div>
                 <div class="option-buttons">
                     <div class="opt-btn" onclick="selectOpt(this, 'ice')">正常冰</div>
                     <div class="opt-btn" onclick="selectOpt(this, 'ice')">少冰</div>
@@ -271,7 +271,6 @@
             }
         }
 
-        // 切換主機模式 (Android 專用)
         function toggleHostMode() {
             const isHost = document.getElementById('isHostMode').checked;
             const token = document.getElementById('syncToken').value.trim();
@@ -281,7 +280,6 @@
                     alert("請先點擊「1. 連線 USB 印表機」按鈕讓 Android 連結印表機！");
                 }
                 alert("已啟動 Android 列印主機模式！背景將自動監聽雲端訂單...");
-                // 開始輪詢雲端佇列
                 if (hostPollingTimer) clearInterval(hostPollingTimer);
                 hostPollingTimer = setInterval(() => pollCloudOrders(token), 3000);
             } else {
@@ -290,7 +288,7 @@
             }
         }
 
-        // 雲端同步：發送訂單到雲端 (iPad 端觸發)
+        // 雲端同步：發送訂單到雲端 (iPad 端觸發) - 改用 PUT
         async function checkoutAndPrint() {
             if (cart.length === 0) {
                 alert("請先選擇飲品！");
@@ -305,7 +303,6 @@
 
             const isHost = document.getElementById('isHostMode').checked;
 
-            // 如果本機就是 Android 主機且已連線 USB，直接本地列印
             if (isHost && usbDevice && usbEndpoint) {
                 await executePrintTasks(cart);
                 cart = [];
@@ -313,10 +310,9 @@
                 return;
             }
 
-            // 否則為 iPad 端：將訂單上傳至雲端佇列讓 Android 主機收單
             try {
                 const response = await fetch(`https://kvdb.io/${token}/queue`, {
-                    method: 'POST',
+                    method: 'PUT',
                     body: JSON.stringify(cart)
                 });
 
@@ -346,12 +342,11 @@
                         const orders = JSON.parse(text);
                         if (Array.isArray(orders) && orders.length > 0) {
                             console.log("收到雲端新訂單，開始列印...", orders);
-                            // 清空雲端佇列避免重複列印
+                            // 清空雲端佇列避免重複列印 - 改用 PUT 清空
                             await fetch(`https://kvdb.io/${token}/queue`, {
-                                method: 'POST',
+                                method: 'PUT',
                                 body: ''
                             });
-                            // 執行實體列印
                             await executePrintTasks(orders);
                         }
                     }
@@ -361,7 +356,6 @@
             }
         }
 
-        // 實際執行 USB 點陣圖列印邏輯
         async function executePrintTasks(printItems) {
             try {
                 const canvas = document.createElement('canvas');
@@ -378,17 +372,14 @@
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.fillStyle = '#000000';
 
-                    // 第一行：[合家好飲品部] 置中 (y=35)
                     ctx.font = 'bold 20px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.fillText('[合家好飲品部]', canvas.width / 2, 35);
 
-                    // 第二行：品項名稱 放大置中 (44px, y=105)
                     ctx.font = 'bold 44px sans-serif';
                     ctx.textAlign = 'center';
                     ctx.fillText(item.name, canvas.width / 2, 105);
 
-                    // 第三行：甜度冰塊/中杯 與 金額 (y=168)
                     ctx.font = 'bold 26px sans-serif';
                     ctx.textAlign = 'left';
                     ctx.fillText(sweetIceStr, 15, 168);
