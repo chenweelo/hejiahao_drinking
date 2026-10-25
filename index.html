@@ -12,9 +12,9 @@
         .status-bar { background: #e9ecef; text-align: center; padding: 10px; font-size: 0.95rem; font-weight: bold; color: #495057; border-bottom: 1px solid #dee2e6; }
         .status-bar.connected { background: #d4edda; color: #155724; border-color: #c3e6cb; }
 
-        /* 雲端同步設定區 */
-        .sync-config { background: #fff3cd; border-bottom: 1px solid #ffeeba; padding: 10px 15px; font-size: 0.9rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
-        .sync-config input { padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.9rem; width: 220px; }
+        /* 雲端同步設定列 */
+        .sync-config { background: #fff3cd; border-bottom: 1px solid #ffeeba; padding: 10px 15px; font-size: 0.85rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+        .sync-config input { padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; font-size: 0.85rem; width: 300px; }
         .sync-config label { font-weight: bold; color: #856404; display: flex; align-items: center; gap: 5px; cursor: pointer; }
 
         .container { max-width: 600px; margin: 0 auto; padding: 15px; }
@@ -60,8 +60,8 @@
     
     <!-- 雲端同步設定列 -->
     <div class="sync-config">
-        <span>☁️ 同步密鑰(亂碼)：</span>
-        <input type="text" id="syncToken" value="qrGbNufPjzsX6g6n1q9Gj" placeholder="貼上 kvdb 亂碼">
+        <span>☁️ 同步網址：</span>
+        <input type="text" id="syncToken" placeholder="貼上 jsonstorage 完整 API 網址">
         <label><input type="checkbox" id="isHostMode" onchange="toggleHostMode()"> 🔴 作為列印主機(Android)</label>
     </div>
 
@@ -273,7 +273,7 @@
 
         function toggleHostMode() {
             const isHost = document.getElementById('isHostMode').checked;
-            const token = document.getElementById('syncToken').value.trim();
+            const syncUrl = document.getElementById('syncToken').value.trim();
             
             if (isHost) {
                 if (!usbDevice || !usbEndpoint) {
@@ -281,23 +281,23 @@
                 }
                 alert("已啟動 Android 列印主機模式！背景將自動監聽雲端訂單...");
                 if (hostPollingTimer) clearInterval(hostPollingTimer);
-                hostPollingTimer = setInterval(() => pollCloudOrders(token), 3000);
+                hostPollingTimer = setInterval(() => pollCloudOrders(syncUrl), 3000);
             } else {
                 if (hostPollingTimer) clearInterval(hostPollingTimer);
                 alert("已關閉主機模式（目前為 iPad 點餐前端模式）。");
             }
         }
 
-        // 雲端同步：發送訂單到雲端 (加入詳細錯誤擷取)
+        // 雲端同步：發送訂單到雲端
         async function checkoutAndPrint() {
             if (cart.length === 0) {
                 alert("請先選擇飲品！");
                 return;
             }
 
-            const token = document.getElementById('syncToken').value.trim();
-            if (!token) {
-                alert("請輸入同步密鑰！");
+            const syncUrl = document.getElementById('syncToken').value.trim();
+            if (!syncUrl) {
+                alert("請輸入完整的同步網址！");
                 return;
             }
 
@@ -311,11 +311,9 @@
             }
 
             try {
-                const response = await fetch(`https://kvdb.io/${token}/queue`, {
+                const response = await fetch(syncUrl, {
                     method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(cart)
                 });
 
@@ -324,7 +322,7 @@
                     cart = [];
                     updateCartUI();
                 } else {
-                    alert(`雲端拒絕接收 (狀態碼: ${response.status})，請檢查密鑰是否正確。`);
+                    alert(`雲端送出失敗 (狀態碼: ${response.status})，請檢查網址是否正確。`);
                 }
             } catch (e) {
                 console.error(e);
@@ -333,26 +331,23 @@
         }
 
         // Android 主機背景輪詢雲端是否有新訂單
-        async function pollCloudOrders(token) {
+        async function pollCloudOrders(syncUrl) {
             const isHost = document.getElementById('isHostMode').checked;
-            if (!isHost || !usbDevice || !usbEndpoint) return;
+            if (!isHost || !usbDevice || !usbEndpoint || !syncUrl) return;
 
             try {
-                const res = await fetch(`https://kvdb.io/${token}/queue`);
+                const res = await fetch(syncUrl);
                 if (res.ok) {
-                    const text = await res.text();
-                    if (text && text.trim() !== '') {
-                        const orders = JSON.parse(text);
-                        if (Array.isArray(orders) && orders.length > 0) {
-                            console.log("收到雲端新訂單，開始列印...", orders);
-                            // 清空雲端佇列
-                            await fetch(`https://kvdb.io/${token}/queue`, {
-                                method: 'PUT',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: ''
-                            });
-                            await executePrintTasks(orders);
-                        }
+                    const data = await res.json();
+                    if (Array.isArray(data) && data.length > 0) {
+                        console.log("收到雲端新訂單，開始列印...", data);
+                        // 清空雲端佇列
+                        await fetch(syncUrl, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify([])
+                        });
+                        await executePrintTasks(data);
                     }
                 }
             } catch (err) {
