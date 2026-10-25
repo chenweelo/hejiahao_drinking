@@ -288,7 +288,7 @@
             }
         }
 
-        // 雲端同步：發送訂單到雲端 (iPad 端觸發) - 改用 PUT
+        // 雲端同步：發送訂單到雲端 (加入詳細錯誤擷取)
         async function checkoutAndPrint() {
             if (cart.length === 0) {
                 alert("請先選擇飲品！");
@@ -313,6 +313,9 @@
             try {
                 const response = await fetch(`https://kvdb.io/${token}/queue`, {
                     method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
                     body: JSON.stringify(cart)
                 });
 
@@ -321,11 +324,11 @@
                     cart = [];
                     updateCartUI();
                 } else {
-                    alert("雲端送出失敗，請檢查網路或密鑰。");
+                    alert(`雲端拒絕接收 (狀態碼: ${response.status})，請檢查密鑰是否正確。`);
                 }
             } catch (e) {
                 console.error(e);
-                alert("連線雲端發生錯誤：" + e.message);
+                alert(`連線雲端發生錯誤: ${e.message}`);
             }
         }
 
@@ -342,9 +345,10 @@
                         const orders = JSON.parse(text);
                         if (Array.isArray(orders) && orders.length > 0) {
                             console.log("收到雲端新訂單，開始列印...", orders);
-                            // 清空雲端佇列避免重複列印 - 改用 PUT 清空
+                            // 清空雲端佇列
                             await fetch(`https://kvdb.io/${token}/queue`, {
                                 method: 'PUT',
+                                headers: { 'Content-Type': 'application/json' },
                                 body: ''
                             });
                             await executePrintTasks(orders);
