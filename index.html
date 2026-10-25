@@ -60,8 +60,8 @@
     
     <!-- 雲端同步設定列 -->
     <div class="sync-config">
-        <span>☁️ 同步網址：</span>
-        <input type="text" id="syncToken" placeholder="貼上 jsonstorage 完整 API 網址">
+        <span>☁️ npoint 網址：</span>
+        <input type="text" id="syncToken" placeholder="貼上 https://api.npoint.io/...">
         <label><input type="checkbox" id="isHostMode" onchange="toggleHostMode()"> 🔴 作為列印主機(Android)</label>
     </div>
 
@@ -288,7 +288,7 @@
             }
         }
 
-        // 雲端同步：發送訂單到雲端
+        // 雲端同步：發送訂單到 npoint
         async function checkoutAndPrint() {
             if (cart.length === 0) {
                 alert("請先選擇飲品！");
@@ -297,7 +297,7 @@
 
             const syncUrl = document.getElementById('syncToken').value.trim();
             if (!syncUrl) {
-                alert("請輸入完整的同步網址！");
+                alert("請輸入完整的 npoint 網址！");
                 return;
             }
 
@@ -330,7 +330,7 @@
             }
         }
 
-        // Android 主機背景輪詢雲端是否有新訂單
+        // Android 主機背景輪詢 npoint 是否有新訂單
         async function pollCloudOrders(syncUrl) {
             const isHost = document.getElementById('isHostMode').checked;
             if (!isHost || !usbDevice || !usbEndpoint || !syncUrl) return;
