@@ -16,13 +16,17 @@
         
         .cart-section { background: white; border-radius: 10px; padding: 15px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 2px solid #d9534f; }
         .cart-header { font-size: 1.1rem; font-weight: bold; color: #d9534f; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 8px; }
-        .cart-list { list-style: none; max-height: 180px; overflow-y: auto; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px dashed #eee; font-size: 0.95rem; }
+        .cart-list { list-style: none; max-height: 220px; overflow-y: auto; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px dashed #eee; font-size: 0.95rem; gap: 8px; }
         .cart-item-info { flex: 1; }
-        .cart-item-name { font-weight: bold; }
+        .cart-item-name { font-weight: bold; font-size: 1rem; }
         .cart-item-sub { font-size: 0.85rem; color: #666; }
-        .cart-item-price { font-weight: bold; color: #d9534f; margin: 0 10px; }
-        .btn-delete { background: #ff4d4f; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; }
+        .cart-item-price { font-weight: bold; color: #d9534f; min-width: 50px; text-align: right; }
+        
+        .cart-action-btns { display: flex; gap: 4px; align-items: center; }
+        .btn-qty { background: #f0ad4e; color: white; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+        .btn-qty:active { background: #ec971f; }
+        .btn-delete { background: #ff4d4f; color: white; border: none; padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 0.85rem; }
 
         .section-title { font-size: 1.1rem; margin: 15px 0 10px; color: #333; font-weight: bold; border-left: 4px solid #d9534f; padding-left: 8px; }
         .menu-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -61,7 +65,7 @@
         <div class="cart-section">
             <div class="cart-header">
                 <span>🛒 已點品項核對區</span>
-                <span style="font-size: 0.85rem; font-weight: normal; color: #777;">點擊可作二次確認</span>
+                <span style="font-size: 0.85rem; font-weight: normal; color: #777;">可直接按 +1 / -1 調整數量</span>
             </div>
             <ul class="cart-list" id="cartList">
                 <li style="text-align: center; color: #aaa; padding: 15px 0;">尚未選擇品項</li>
@@ -108,7 +112,7 @@
 
             <div class="option-group" id="sweetSection">
                 <div class="option-title">甜度</div>
-                <div class="option-buttons">
+                <div class="option-buttons" id="sweetOptions">
                     <div class="opt-btn" onclick="selectOpt(this, 'sweet')">正常糖</div>
                     <div class="opt-btn" onclick="selectOpt(this, 'sweet')">少糖</div>
                     <div class="opt-btn" onclick="selectOpt(this, 'sweet')">半糖</div>
@@ -119,7 +123,7 @@
 
             <div class="option-group">
                 <div class="option-title">冰塊 / 溫度</div>
-                <div class="option-buttons">
+                <div class="option-buttons" id="iceOptions">
                     <div class="opt-btn" onclick="selectOpt(this, 'ice')">正常冰</div>
                     <div class="opt-btn" onclick="selectOpt(this, 'ice')">少冰</div>
                     <div class="opt-btn active" onclick="selectOpt(this, 'ice')">微冰</div>
@@ -167,7 +171,22 @@
                 currentItem.sweet = '甜度固定';
             } else {
                 sweetSec.style.display = 'block';
+                document.querySelectorAll('#sweetOptions .opt-btn').forEach(b => {
+                    if (b.innerText === '無糖') {
+                        b.classList.add('active');
+                    } else {
+                        b.classList.remove('active');
+                    }
+                });
             }
+
+            document.querySelectorAll('#iceOptions .opt-btn').forEach(b => {
+                if (b.innerText === '微冰') {
+                    b.classList.add('active');
+                } else {
+                    b.classList.remove('active');
+                }
+            });
 
             document.getElementById('itemModal').style.display = 'flex';
         }
@@ -190,13 +209,28 @@
         }
 
         function addToCart() {
-            cart.push({...currentItem});
+            let existing = cart.find(i => 
+                i.name === currentItem.name && 
+                i.size === currentItem.size && 
+                i.sweet === currentItem.sweet && 
+                i.ice === currentItem.ice
+            );
+
+            if (existing) {
+                existing.qty += 1;
+            } else {
+                cart.push({...currentItem, qty: 1});
+            }
+
             updateCartUI();
             closeModal();
         }
 
-        function removeFromCart(index) {
-            cart.splice(index, 1);
+        function changeQty(index, delta) {
+            cart[index].qty += delta;
+            if (cart[index].qty <= 0) {
+                cart.splice(index, 1);
+            }
             updateCartUI();
         }
 
@@ -213,26 +247,35 @@
             }
 
             cartList.innerHTML = '';
-            let total = 0;
+            let totalCount = 0;
+            let totalPrice = 0;
 
             cart.forEach((item, index) => {
-                total += item.price;
+                let itemTotal = item.price * item.qty;
+                totalCount += item.qty;
+                totalPrice += itemTotal;
+
                 let sweetText = item.isFixedSweet ? '' : item.sweet + '/';
                 let sizeSuffix = (item.size === 'M') ? '/中杯' : '';
+                
                 cartList.innerHTML += `
                     <li class="cart-item">
                         <div class="cart-item-info">
-                            <div class="cart-item-name">${item.name} (${item.size})</div>
+                            <div class="cart-item-name">${item.name} (${item.size}) <span style="color:#d9534f;">x${item.qty}</span></div>
                             <div class="cart-item-sub">${sweetText}${item.ice}${sizeSuffix}</div>
                         </div>
-                        <div class="cart-item-price">$${item.price}</div>
-                        <button class="btn-delete" onclick="removeFromCart(${index})">刪除</button>
+                        <div class="cart-item-price">$${itemTotal}</div>
+                        <div class="cart-action-btns">
+                            <button class="btn-qty" onclick="changeQty(${index}, 1)">+1</button>
+                            <button class="btn-qty" onclick="changeQty(${index}, -1)">-1</button>
+                            <button class="btn-delete" onclick="changeQty(${index}, -999)">刪除</button>
+                        </div>
                     </li>
                 `;
             });
 
-            cartCount.innerText = cart.length;
-            cartTotal.innerText = `$${total}`;
+            cartCount.innerText = totalCount;
+            cartTotal.innerText = `$${totalPrice}`;
         }
 
         async function connectUsbPrinter() {
@@ -258,7 +301,6 @@
             }
         }
 
-        // 單機直接列印
         async function checkoutAndPrint() {
             if (cart.length === 0) {
                 alert("請先選擇飲品！");
@@ -272,7 +314,7 @@
 
             try {
                 await executePrintTasks(cart);
-                alert(`已成功列印 ${cart.length} 筆訂單！`);
+                alert(`已成功列印所有杯貼！`);
                 cart = [];
                 updateCartUI();
             } catch (error) {
@@ -287,73 +329,95 @@
             canvas.height = 200;
             const ctx = canvas.getContext('2d');
 
+            // 計算此次結帳的總杯數
+            let totalCups = 0;
+            printItems.forEach(item => {
+                totalCups += item.qty;
+            });
+
+            let currentCup = 1;
+
             for (let item of printItems) {
-                let sizeSuffix = (item.size === 'M') ? '/中杯' : '';
-                let sweetIceStr = item.isFixedSweet ? (item.ice + sizeSuffix) : `${item.sweet}/${item.ice}${sizeSuffix}`;
-                let priceStr = `$${item.price}`;
+                for (let q = 0; q < item.qty; q++) {
+                    let sizeSuffix = (item.size === 'M') ? '/中杯' : '';
+                    let sweetIceStr = item.isFixedSweet ? (item.ice + sizeSuffix) : `${item.sweet}/${item.ice}${sizeSuffix}`;
+                    let priceStr = `$${item.price}`;
+                    let indexStr = `${currentCup}/${totalCups}`; // 右上角序號 (例如 1/3)
 
-                ctx.fillStyle = '#FFFFFF';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.fillStyle = '#000000';
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.fillStyle = '#000000';
 
-                ctx.font = 'bold 20px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('[合家好飲品部]', canvas.width / 2, 35);
+                    // 店名置中
+                    ctx.font = 'bold 20px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('[合家好飲品部]', canvas.width / 2, 35);
 
-                ctx.font = 'bold 44px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(item.name, canvas.width / 2, 105);
+                    // 右上角顯示幾分之幾 (例如 1/3)
+                    ctx.font = 'bold 22px sans-serif';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(indexStr, canvas.width - 15, 35);
 
-                ctx.font = 'bold 26px sans-serif';
-                ctx.textAlign = 'left';
-                ctx.fillText(sweetIceStr, 15, 168);
+                    // 品名
+                    ctx.font = 'bold 44px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(item.name, canvas.width / 2, 105);
 
-                ctx.textAlign = 'right';
-                ctx.fillText(priceStr, canvas.width - 15, 168);
+                    // 甜度冰塊
+                    ctx.font = 'bold 26px sans-serif';
+                    ctx.textAlign = 'left';
+                    ctx.fillText(sweetIceStr, 15, 168);
 
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const wBytes = Math.ceil(canvas.width / 8);
-                const h = canvas.height;
-                const bitmapBytes = new Uint8Array(wBytes * h);
+                    // 價格
+                    ctx.textAlign = 'right';
+                    ctx.fillText(priceStr, canvas.width - 15, 168);
 
-                for (let y = 0; y < h; y++) {
-                    for (let x = 0; x < canvas.width; x++) {
-                        let idx = (y * canvas.width + x) * 4;
-                        let avg = (imgData.data[idx] + imgData.data[idx+1] + imgData.data[idx+2]) / 3;
-                        if (avg < 128) {
-                            let byteIdx = y * wBytes + Math.floor(x / 8);
-                            let bitIdx = 7 - (x % 8);
-                            bitmapBytes[byteIdx] |= (1 << bitIdx);
+                    currentCup++; // 杯數序號遞增
+
+                    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const wBytes = Math.ceil(canvas.width / 8);
+                    const h = canvas.height;
+                    const bitmapBytes = new Uint8Array(wBytes * h);
+
+                    for (let y = 0; y < h; y++) {
+                        for (let x = 0; x < canvas.width; x++) {
+                            let idx = (y * canvas.width + x) * 4;
+                            let avg = (imgData.data[idx] + imgData.data[idx+1] + imgData.data[idx+2]) / 3;
+                            if (avg < 128) {
+                                let byteIdx = y * wBytes + Math.floor(x / 8);
+                                let bitIdx = 7 - (x % 8);
+                                bitmapBytes[byteIdx] |= (1 << bitIdx);
+                            }
                         }
                     }
+
+                    for (let i = 0; i < bitmapBytes.length; i++) {
+                        bitmapBytes[i] = ~bitmapBytes[i] & 0xFF;
+                    }
+
+                    let header = 
+                        "SIZE 40 mm,25 mm\r\n" +
+                        "GAP 2 mm,0 mm\r\n" +
+                        "OFFSET 0 mm\r\n" +
+                        "DIRECTION 1\r\n" +
+                        "CLS\r\n" +
+                        `BITMAP 0,0,${wBytes},${h},0,`;
+                    
+                    let footer = "\r\nPRINT 1,1\r\n";
+
+                    const encoder = new TextEncoder();
+                    const headerBuf = encoder.encode(header);
+                    const footerBuf = encoder.encode(footer);
+
+                    const totalLength = headerBuf.length + bitmapBytes.length + footerBuf.length;
+                    const fullPacket = new Uint8Array(totalLength);
+                    fullPacket.set(headerBuf, 0);
+                    fullPacket.set(bitmapBytes, headerBuf.length);
+                    fullPacket.set(footerBuf, headerBuf.length + bitmapBytes.length);
+
+                    await usbDevice.transferOut(usbEndpoint.endpointNumber, fullPacket);
+                    await new Promise(resolve => setTimeout(resolve, 400));
                 }
-
-                for (let i = 0; i < bitmapBytes.length; i++) {
-                    bitmapBytes[i] = ~bitmapBytes[i] & 0xFF;
-                }
-
-                let header = 
-                    "SIZE 40 mm,25 mm\r\n" +
-                    "GAP 2 mm,0 mm\r\n" +
-                    "OFFSET 0 mm\r\n" +
-                    "DIRECTION 1\r\n" +
-                    "CLS\r\n" +
-                    `BITMAP 0,0,${wBytes},${h},0,`;
-                
-                let footer = "\r\nPRINT 1,1\r\n";
-
-                const encoder = new TextEncoder();
-                const headerBuf = encoder.encode(header);
-                const footerBuf = encoder.encode(footer);
-
-                const totalLength = headerBuf.length + bitmapBytes.length + footerBuf.length;
-                const fullPacket = new Uint8Array(totalLength);
-                fullPacket.set(headerBuf, 0);
-                fullPacket.set(bitmapBytes, headerBuf.length);
-                fullPacket.set(footerBuf, headerBuf.length + bitmapBytes.length);
-
-                await usbDevice.transferOut(usbEndpoint.endpointNumber, fullPacket);
-                await new Promise(resolve => setTimeout(resolve, 500));
             }
         }
     </script>
